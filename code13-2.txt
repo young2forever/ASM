@@ -495,9 +495,9 @@ load_relocate_program:                      ;加载并重定位用户程序
          push ecx
 
          mov ecx,64                         ;检索表中，每条目的比较次数 //64*4=256字节，条目符号名部分占用256字节
-         repe cmpsd                         ;每次比较4字节 
+         repe cmpsd                         ;每次比较4字节 //相等则重复，不等则退出 
          jnz .b4
-         mov eax,[esi]                      ;若匹配，esi恰好指向其后的地址数据 //C-ASLT最后6字节是偏移地址和段选择子
+         mov eax,[esi]                      ;若匹配，esi恰好指向其后的地址数据 //C-SALT最后6字节是偏移地址和段选择子
          mov [es:edi-256],eax               ;将字符串改写成偏移地址 
          mov ax,[esi+4]
          mov [es:edi-252],ax                ;以及段选择子 
@@ -505,12 +505,12 @@ load_relocate_program:                      ;加载并重定位用户程序
       
          pop ecx                            
          pop esi
-         add esi,salt_item_len
+         add esi,salt_item_len              //esi发生了变化，即C-SALT向后移动一个条目
          pop edi                            ;从头比较 
          loop .b3
       
          pop edi                            <=====外循环，以上是内循环
-         add edi,256
+         add edi,256                        //edi加256，即U-SALT向后移动一个条目
          pop ecx
          loop .b2
 
