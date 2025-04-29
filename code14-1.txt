@@ -411,7 +411,7 @@ SECTION core_data vstart=0                  ;系统核心的数据段
          cpu_brnd1        db 0x0d,0x0a,0x0d,0x0a,0
 
          ;任务控制块链
-         tcb_chain        dd  0
+         tcb_chain        dd  0             //见图14-13，指向首个TCB
 
 core_data_end:
                
@@ -465,15 +465,15 @@ load_relocate_program:                      ;加载并重定位用户程序
                                             ;输入: PUSH 逻辑扇区号
                                             ;      PUSH 任务控制块基地址
                                             ;输出：无 
-         pushad
-      
+         pushad                             //将所有通用寄存器值入栈
+                                            //EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI
          push ds
          push es
       
          mov ebp,esp                        ;为访问通过堆栈传递的参数做准备
       
          mov ecx,mem_0_4_gb_seg_sel
-         mov es,ecx
+         mov es,ecx                         //令ES指向4GB内存段
       
          mov esi,[ebp+11*4]                 ;从堆栈中取得TCB的基地址
 
@@ -525,11 +525,11 @@ load_relocate_program:                      ;加载并重定位用户程序
          mov ebx,[edi+0x04]                 ;段长度
          dec ebx                            ;段界限
          mov ecx,0x0040f200                 ;字节粒度的数据段描述符，特权级3 
-         call sys_routine_seg_sel:make_seg_descriptor
+         call sys_routine_seg_sel:make_seg_descriptor   //在EDX:EAX中返回64位段描述符
       
          ;安装头部段描述符到LDT中 
          mov ebx,esi                        ;TCB的基地址
-         call fill_descriptor_in_ldt
+         call fill_descriptor_in_ldt        //cx输出描述符选择子
 
          or cx,0000_0000_0000_0011B         ;设置选择子的特权级为3
          mov [es:esi+0x44],cx               ;登记程序头部段选择子到TCB 
@@ -578,7 +578,7 @@ load_relocate_program:                      ;加载并重定位用户程序
          ;重定位SALT 
          mov eax,mem_0_4_gb_seg_sel         ;这里和前一章不同，头部段描述符
          mov es,eax                         ;已安装，但还没有生效，故只能通
-                                            ;过4GB段访问用户程序头部          
+                                            ;过4GB段访问用户程序头部          //生效需要加载局部描述符表寄存器LDTR
          mov eax,core_data_seg_sel
          mov ds,eax
       
@@ -590,8 +590,8 @@ load_relocate_program:                      ;加载并重定位用户程序
          push ecx
          push edi
       
-         mov ecx,salt_items
-         mov esi,salt
+         mov ecx,salt_items                 //C-SALT条目数
+         mov esi,salt                       //C-SALT起始
   .b3:
          push edi
          push esi
@@ -610,12 +610,12 @@ load_relocate_program:                      ;加载并重定位用户程序
       
          pop ecx
          pop esi
-         add esi,salt_item_len
+         add esi,salt_item_len              //C-SALT向后移动一个条目
          pop edi                            ;从头比较 
          loop .b3
       
          pop edi
-         add edi,256
+         add edi,256                        //U-SALT向后移动一个条目
          pop ecx
          loop .b2
 
@@ -835,12 +835,12 @@ start:
          ;创建任务控制块。这不是处理器的要求，而是我们自己为了方便而设立的
          mov ecx,0x46
          call sys_routine_seg_sel:allocate_memory
-         call append_to_tcb_link            ;将任务控制块追加到TCB链表 
+         call append_to_tcb_link            ;将任务控制块追加到TCB链表 //返回时ECX内容是新TCB的线性地址
       
          push dword 50                      ;用户程序位于逻辑50扇区
          push ecx                           ;压入任务控制块起始线性地址 
        
-         call load_relocate_program
+         call load_relocate_program         //参数使用栈传入
       
          mov ebx,do_status
          call sys_routine_seg_sel:put_string
